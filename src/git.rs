@@ -12,46 +12,49 @@ pub struct SmartGitRequest {
 
 impl SmartGitRequest {
     pub fn info_refs(&self, pack_type: GitPackType) -> InfoRefsOutput {
-        let mut output: String = String::new();
-
-        match pack_type {
-            GitPackType::Upload => output = string_push_bytes(output, "001e# service=git-upload-pack\n".as_bytes().to_vec()),
-            GitPackType::Receive => output = string_push_bytes(output, "001f# service=git-receive-pack\n".as_bytes().to_vec())
+        let mut output: String = match pack_type {
+            GitPackType::Upload => "001e# service=git-upload-pack\n".into(),
+            GitPackType::Receive => "001f# service=git-receive-pack\n".into(),
         };
 
-        let git_pack: String = match pack_type {
-            GitPackType::Upload => String::from("upload-pack"),
-            GitPackType::Receive => String::from("receive-pack")
+        let git_pack: &str = match pack_type {
+            GitPackType::Upload => "upload-pack",
+            GitPackType::Receive => "receive-pack",
         };
 
         let command = Command::new("git")
-            .arg(git_pack.as_str())
+            .arg(git_pack)
             .arg("--stateless-rpc")
             .arg("--advertise-refs")
-            .arg(self.repository.as_str()).output();
+            .arg(self.repository.as_str())
+            .output()
+            .expect("failed to execute git process");
 
-        output = string_push_bytes(output, "0000".as_bytes().to_vec());
-        output = string_push_bytes(output, command
-            .expect("failed to execute git process")
-            .stdout);
+        if !command.status.success() {
+            let err = String::from_utf8(command.stderr).unwrap();
+            panic!(err);
+        }
+
+        output.push_str("0000");
+        output.push_str(String::from_utf8_lossy(&*command.stdout).as_ref());
 
         InfoRefsOutput {
             body: output,
             content_type: match pack_type {
                 GitPackType::Upload => String::from("application/x-git-upload-pack-advertisement"),
                 GitPackType::Receive => String::from("application/x-git-receive-pack-advertisement")
-            }
+            },
         }
     }
 
     pub fn stateless_rpc(&self, pack_type: GitPackType, body: Vec<u8>) -> StatelessRpcOutput {
-        let git_pack: String = match pack_type {
-            GitPackType::Upload => String::from("upload-pack"),
-            GitPackType::Receive => String::from("receive-pack")
+        let git_pack: &str = match pack_type {
+            GitPackType::Upload => "upload-pack",
+            GitPackType::Receive => "receive-pack",
         };
 
         let mut child = Command::new("git")
-            .arg(git_pack.as_str())
+            .arg(git_pack)
             .arg("--stateless-rpc")
             .arg(self.repository.as_str())
             .stdin(Stdio::piped())
@@ -67,7 +70,7 @@ impl SmartGitRequest {
             content_type: match pack_type {
                 GitPackType::Upload => String::from("application/x-git-upload-pack-result"),
                 GitPackType::Receive => String::from("application/x-git-receive-pack-result")
-            }
+            },
         }
     }
 }
@@ -80,12 +83,4 @@ pub struct InfoRefsOutput {
 pub struct StatelessRpcOutput {
     pub body: Vec<u8>,
     pub content_type: String,
-}
-
-fn string_push_bytes(mut output: String, bytes: Vec<u8>) -> String {
-    for byte in bytes {
-        output.push(byte as char);
-    }
-
-    output
 }
