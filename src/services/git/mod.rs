@@ -6,11 +6,11 @@ pub enum GitPackType {
     Receive,
 }
 
-pub struct SmartGitRequest {
+pub struct GitService {
     pub repository: String
 }
 
-impl SmartGitRequest {
+impl GitService {
     pub fn info_refs(&self, pack_type: GitPackType) -> InfoRefsOutput {
         let mut output: String = match pack_type {
             GitPackType::Upload => "001e# service=git-upload-pack\n".into(),
