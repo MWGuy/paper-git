@@ -1,5 +1,5 @@
 [package]
-name = "papaer_git"
+name = "paper-git"
 version = "0.1.0"
 authors = ["MWGuy <yousan4ik@gmail.com>"]
 edition = "2018"
